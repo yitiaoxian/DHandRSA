@@ -1,5 +1,10 @@
 package dh;
 
+import RSA.RSATest;
+import RSA.RSAUtils;
+import org.apache.commons.codec.binary.Base64;
+
+import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -80,7 +85,30 @@ public class DH{
         }
     }
     public static void main(String[] args){
-        System.out.println("A和B约定一个4位的随机大素数n, 5位的随机大素数g");
+
+        RSATest A_RSA = new RSATest();
+        KeyPair AKeyPair = null;
+        try {
+            AKeyPair = A_RSA.getKeyPair();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        String A_pubKey = new String(Base64.encodeBase64(AKeyPair.getPublic().getEncoded()));
+        String A_priKey = new String(Base64.encodeBase64(AKeyPair.getPrivate().getEncoded()));
+        //A的非对称密钥对
+
+        RSATest B_RSA = new RSATest();
+        KeyPair BKeyPair = null;
+        try {
+            BKeyPair = B_RSA.getKeyPair();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        String B_pubKey = new String(Base64.encodeBase64(BKeyPair.getPublic().getEncoded()));
+        String B_priKey = new String(Base64.encodeBase64(BKeyPair.getPrivate().getEncoded()));
+        //B的非对称密钥对
+
+        System.out.println("A和B约定一个4位的随机大素数p, 5位的随机大素数g");
         long longPrimeVar4_n = createRadomPrimeNumber(4);
         System.out.println("p="+longPrimeVar4_n);
         //共享的g
@@ -88,26 +116,68 @@ public class DH{
         System.out.println("g="+longPrimeVar5_g);
         //得到一个4位的随机大数
         long longVar4_x = createRandomNumber(3);
-        System.out.println("A选择一个3位的大随机数a="+longVar4_x);
+        System.out.println("A选择一个随机数a="+longVar4_x);
         //得到一个3位的随机大数
         long  longVar5_y = createRandomNumber(3);
-        System.out.println("B选择一个3位的大随机数b="+longVar5_y);
+        System.out.println("B选择一个随机数b="+longVar5_y);
         //计算A,B
         long A = (long)largeMOD(longPrimeVar5_g,longVar4_x,longPrimeVar4_n);
-        System.out.println("A根据x计算出A="+A+"  并发给B");
+        System.out.println("A根据a计算出Ya="+A+"  发送给B");
+
+        String BSign = null;//B的签名
+        String encryptB = null;
+
         long B = (long)largeMOD(longPrimeVar5_g,longVar5_y,longPrimeVar4_n);
-        System.out.println("B根据y计算出B="+B+"  并发给A");
+        long K2 = (long)largeMOD(A,longVar5_y,longPrimeVar4_n);
+        System.out.println("B根据A计算出密匙K2="+K2);
+        try {
+            encryptB = B_RSA.encrypt(String.valueOf(B),B_RSA.getPublicKey(B_pubKey));
+            BSign = B_RSA.sign(encryptB,B_RSA.getPrivateKey(B_priKey));//B的签名
+            System.out.println("B进行签名：\n"+BSign+"\n并将签名发送给A");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        System.out.println("A对收到的签名进行验证：");
+        try {
+            Boolean Aresult = B_RSA.verify(encryptB,B_RSA.getPublicKey(B_pubKey),BSign);
+            if(Aresult) {
+                System.out.println("验证成功！");
+            }else{
+                System.out.println("验证失败！密钥协商不安全！");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         //计算K1，K2
         long K1 = (long)largeMOD(B,longVar4_x,longPrimeVar4_n);
         System.out.println("A根据B计算出密匙K1="+K1);
-        long K2 = (long)largeMOD(A,longVar5_y,longPrimeVar4_n);
-        System.out.println("B根据A计算出密匙K2="+K2);
+
+        String ASign = null;//A的签名
+        String encryptA = null;
+        try {
+            encryptA  = A_RSA.encrypt(String.valueOf(A),A_RSA.getPublicKey(A_pubKey));
+            ASign = A_RSA.sign(encryptA,A_RSA.getPrivateKey(A_priKey));
+            System.out.println("A进行签名：\n"+ASign+"\n并将签名发送给B");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        System.out.println("B对A发来的签名进行验证：");
+        try {
+            Boolean Bresult = A_RSA.verify(encryptA,A_RSA.getPublicKey(A_pubKey),ASign);
+            if(Bresult){
+                System.out.println("验证成功！");
+            }else {
+                System.out.println("验证失败！密钥协商不安全！");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         //判断K1是否等于k2
         if(K1==K2) {
-            System.out.println("K1=K2");
+            System.out.println("K1=K2,密钥协商过程结束。");
         }
         else {
-            System.out.println("error");
+            System.out.println("error，密钥协商不安全！");
         }
     }
 }
